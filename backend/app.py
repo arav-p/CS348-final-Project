@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from db_setup import init_app, db
 from models import Workout, Exercise
-
+# testing edit
 app = init_app()
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 with app.app_context():

@@ -15,9 +15,32 @@ with app.app_context():
 def serve_index():
     return send_from_directory("../frontend/dist", "index.html")
 
+@app.route("/api/workouts/<int:id>", methods=["PUT"])
+def update_workout(id):
+    data = request.json
+    workout = Workout.query.get_or_404(id)
+    workout.name = data['name']
+    workout.date = data['date']
+    db.session.commit()
+    return jsonify({ "message": "Workout updated" })
+
 @app.route("/<path:path>")
 def serve_static(path):
     return send_from_directory("../frontend/dist", path)
+
+@app.route("/api/report/summary", methods=["GET"])
+def report_summary():
+    start = request.args.get("start")
+    end = request.args.get("end")
+    query = text("""
+        SELECT COUNT(*) as count,
+               AVG(LENGTH(name)) as averageNameLength,
+               SUM(LENGTH(name)) as total
+        FROM workout
+        WHERE date BETWEEN :start AND :end
+    """)
+    result = db.session.execute(query, {"start": start, "end": end}).mappings().first()
+    return jsonify(dict(result))
 
 @app.route("/api/workouts", methods=["GET"])
 def get_workouts():

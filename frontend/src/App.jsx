@@ -1,45 +1,53 @@
+// App.jsx (Simplified: Workouts only, with edit + report filtering)
 import { useState, useEffect } from 'react'
 
 function App() {
   const [workouts, setWorkouts] = useState([])
-  const [newWorkout, setNewWorkout] = useState({ name: '', date: '', exercises: [] })
-  const [newExercise, setNewExercise] = useState({ name: '', sets: '', reps: '' })
-  const [exerciseCounts, setExerciseCounts] = useState([])
+  const [newWorkout, setNewWorkout] = useState({ name: '', date: '' })
+  const [editWorkoutId, setEditWorkoutId] = useState(null)
+  const [filter, setFilter] = useState({ start: '', end: '' })
+  const [report, setReport] = useState({ total: 0, averageNameLength: 0, count: 0 })
 
   useEffect(() => {
+    fetchWorkouts()
+  }, [])
+
+  const fetchWorkouts = () => {
     fetch('/api/workouts')
       .then(res => res.json())
       .then(setWorkouts)
-
-    fetch('/api/report/exercise_counts')
-      .then(res => res.json())
-      .then(setExerciseCounts)
-  }, [])
-
-  const addExercise = () => {
-    if (!newExercise.name || !newExercise.sets || !newExercise.reps) return
-    setNewWorkout(prev => ({
-      ...prev,
-      exercises: [...prev.exercises, newExercise]
-    }))
-    setNewExercise({ name: '', sets: '', reps: '' })
   }
 
-  const addWorkout = () => {
-    fetch('/api/workouts', {
-      method: 'POST',
+  const addOrUpdateWorkout = () => {
+    const method = editWorkoutId ? 'PUT' : 'POST'
+    const url = editWorkoutId ? `/api/workouts/${editWorkoutId}` : '/api/workouts'
+
+    fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newWorkout)
     }).then(() => {
-      setNewWorkout({ name: '', date: '', exercises: [] })
-      window.location.reload()
+      setNewWorkout({ name: '', date: '' })
+      setEditWorkoutId(null)
+      fetchWorkouts()
     })
   }
 
   const deleteWorkout = (id) => {
-    fetch(`/api/workouts/${id}`, {
-      method: 'DELETE'
-    }).then(() => window.location.reload())
+    fetch(`/api/workouts/${id}`, { method: 'DELETE' })
+      .then(fetchWorkouts)
+  }
+
+  const loadWorkoutForEdit = (workout) => {
+    setNewWorkout({ name: workout.name, date: workout.date })
+    setEditWorkoutId(workout.id)
+  }
+
+  const generateReport = () => {
+    const query = new URLSearchParams(filter).toString()
+    fetch(`/api/report/summary?${query}`)
+      .then(res => res.json())
+      .then(setReport)
   }
 
   return (
@@ -47,39 +55,37 @@ function App() {
       <h1>Workout Tracker</h1>
 
       <input placeholder="Workout Name" value={newWorkout.name} onChange={e => setNewWorkout({ ...newWorkout, name: e.target.value })} />
-      <input placeholder="Date" value={newWorkout.date} onChange={e => setNewWorkout({ ...newWorkout, date: e.target.value })} />
-
-      <h3>Add Exercise</h3>
-      <input placeholder="Exercise Name" value={newExercise.name} onChange={e => setNewExercise({ ...newExercise, name: e.target.value })} />
-      <input placeholder="Sets" value={newExercise.sets} onChange={e => setNewExercise({ ...newExercise, sets: e.target.value })} />
-      <input placeholder="Reps" value={newExercise.reps} onChange={e => setNewExercise({ ...newExercise, reps: e.target.value })} />
-      <button onClick={addExercise}>Add Exercise</button>
-
-      <button onClick={addWorkout}>Add Workout</button>
+      <input type="date" value={newWorkout.date} onChange={e => setNewWorkout({ ...newWorkout, date: e.target.value })} />
+      <button onClick={addOrUpdateWorkout}>{editWorkoutId ? 'Update' : 'Add'} Workout</button>
 
       <h2>All Workouts</h2>
       <ul>
         {workouts.map(w => (
           <li key={w.id}>
-            <h3>{w.name} ({w.date})</h3>
-            <ul>
-              {w.exercises.map(ex => (
-                <li key={ex.id}>{ex.name}: {ex.sets}x{ex.reps}</li>
-              ))}
-            </ul>
+            <strong>{w.name}</strong> ({w.date})
+            <button onClick={() => loadWorkoutForEdit(w)}>Edit</button>
             <button onClick={() => deleteWorkout(w.id)}>Delete</button>
           </li>
         ))}
       </ul>
 
-      <h2>Exercise Report</h2>
-      <ul>
-        {exerciseCounts.map(ec => (
-          <li key={ec.name}>{ec.name}: {ec.count}</li>
-        ))}
-      </ul>
+      <h2>Workout Report</h2>
+      <div>
+        <label>Start Date: </label>
+        <input type="date" value={filter.start} onChange={e => setFilter({ ...filter, start: e.target.value })} />
+        <label>End Date: </label>
+        <input type="date" value={filter.end} onChange={e => setFilter({ ...filter, end: e.target.value })} />
+        <button onClick={generateReport}>Generate Report</button>
+      </div>
+
+      <div>
+        <p><strong>Total Workouts:</strong> {report.count}</p>
+        <p><strong>Average Workout Name Length:</strong> {report.averageNameLength}</p>
+        <p><strong>Workout Names Combined:</strong> {report.total}</p>
+      </div>
     </div>
   )
 }
 
-export default App
+export default App;
+
